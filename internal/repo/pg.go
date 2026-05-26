@@ -9,11 +9,7 @@ import (
 	"time"
 )
 
-type PostgresRepo struct {
-	Pool *pgxpool.Pool
-}
-
-func NewPostgresRepo(cfg config.Config) (*PostgresRepo, error) {
+func NewPostgresPool(cfg config.Config) (*pgxpool.Pool, error) {
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName)
 
@@ -36,9 +32,5 @@ func NewPostgresRepo(cfg config.Config) (*PostgresRepo, error) {
 	}
 
 	log.Println("Successfully connected to PostgreSQL")
-	return &PostgresRepo{Pool: pool}, nil
-}
-
-func (r *PostgresRepo) Close() {
-	r.Pool.Close()
+	return pool, nil
 }

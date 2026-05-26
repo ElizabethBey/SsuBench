@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"ssubench/internal/config"
 	"ssubench/internal/httpserver"
+	"ssubench/internal/repo"
 	"syscall"
 	"time"
 )
@@ -24,6 +26,12 @@ func init() {
 func main() {
 	cfg := config.FromEnv()
 
+	pool, err := repo.NewPostgresPool(cfg)
+	if err != nil {
+		log.Fatalf("failed to connect to db: %v", err)
+	}
+	defer pool.Close()
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: cfg.LogLevel,
 	}))
@@ -32,7 +40,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv := httpserver.New(cfg, logger)
+	srv := httpserver.New(cfg, pool, logger)
 
 	go func() {
 		logger.Info("http server starting", "addr", cfg.HTTPAddr)
