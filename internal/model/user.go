@@ -2,6 +2,13 @@ package model
 
 import "time"
 
+type ContextKey string
+
+const (
+	UserIDKey   ContextKey = "user_id"
+	UserRoleKey ContextKey = "user_role"
+)
+
 type Role string
 
 const (
