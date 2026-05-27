@@ -11,13 +11,6 @@ import (
 	"time"
 )
 
-type contextKey string
-
-const (
-	UserIDKey   contextKey = "user_id"
-	UserRoleKey contextKey = "user_role"
-)
-
 type statusCapturingResponseWriter struct {
 	http.ResponseWriter
 	status int
@@ -32,7 +25,6 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 				return
 			}
 
-			// Ожидаем формат "Bearer <token>"
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 				handler.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid authorization format")
@@ -46,8 +38,8 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), UserIDKey, userID)
-			ctx = context.WithValue(ctx, UserRoleKey, role)
+			ctx := context.WithValue(r.Context(), model.UserIDKey, userID)
+			ctx = context.WithValue(ctx, model.UserRoleKey, role)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -57,7 +49,7 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 func RoleMiddleware(allowedRoles ...model.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userRole, ok := r.Context().Value(UserRoleKey).(model.Role)
+			userRole, ok := r.Context().Value(model.UserRoleKey).(model.Role)
 			if !ok {
 				handler.WriteError(w, http.StatusForbidden, "forbidden", "user role not found in context")
 				return
