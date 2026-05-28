@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func New(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) *http.Server {
@@ -49,6 +50,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) *http.Serve
 	mux.Handle("POST /admin/users/{id}/block", authMiddleware(roleAdmin(http.HandlerFunc(adminHandler.BlockUser))))
 	mux.Handle("POST /admin/users/{id}/unblock", authMiddleware(roleAdmin(http.HandlerFunc(adminHandler.UnblockUser))))
 	mux.Handle("GET /admin/users", authMiddleware(roleAdmin(http.HandlerFunc(adminHandler.ListUsers))))
+
+	mux.HandleFunc("/docs/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "api/openapi.yaml")
+	})
+	mux.Handle("/docs/", httpSwagger.Handler(httpSwagger.URL("/docs/openapi.yaml")))
 
 	// Middleware (минимум): логирование + recover
 	handlr := RecoverMiddleware(logger, LoggingMiddleware(logger, mux))
