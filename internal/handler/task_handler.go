@@ -7,6 +7,7 @@ import (
 	"ssubench/internal/model"
 	"ssubench/internal/service"
 	"strconv"
+	"strings"
 )
 
 type TaskHandler struct {
@@ -27,6 +28,16 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, http.StatusBadRequest, "bad_request", "invalid json")
+		return
+	}
+
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		WriteError(w, http.StatusBadRequest, "validation_error", "title is required")
+		return
+	}
+	if req.Budget <= 0 {
+		WriteError(w, http.StatusBadRequest, "validation_error", "budget must be greater than 0")
 		return
 	}
 
@@ -74,6 +85,11 @@ func (h *TaskHandler) CreateBid(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateBidRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, http.StatusBadRequest, "bad_request", "invalid json")
+		return
+	}
+
+	if req.Amount <= 0 {
+		WriteError(w, http.StatusBadRequest, "validation_error", "amount must be greater than 0")
 		return
 	}
 
