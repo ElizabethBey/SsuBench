@@ -1,0 +1,679 @@
+openapi: "3.0.3"
+info:
+  title: SsuBench API
+  description: |
+    Платформа для размещения заданий с виртуальными баллами.
+    Заказчики создают задачи, исполнители откликаются, оплата — виртуальными баллами.
+
+    **Роли:**
+    - customer — заказчик (создаёт задачи, выбирает исполнителя, подтверждает выполнение)
+    - executor — исполнитель (откликается, выполняет задачи)
+    - admin — администратор (блокирует/разблокирует пользователей, полный доступ)
+
+  version: "1.0.0"
+  contact:
+    name: SsuBench Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Регистрация и аутентификация
+  - name: Tasks
+    description: Управление задачами и откликами
+  - name: Admin
+    description: Административные функции
+
+paths:
+  # ==========================================================================
+  # Аутентификация
+  # ==========================================================================
+  /register:
+    post:
+      tags: [Auth]
+      summary: Регистрация нового пользователя
+      description: Создаёт нового пользователя с указанной ролью. Пароль хешируется bcrypt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Пользователь успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Аутентификация пользователя
+      description: Проверяет email и пароль, возвращает JWT-токен (24 часа).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Успешный вход, возвращает JWT-токен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ==========================================================================
+  # Задачи
+  # ==========================================================================
+  /tasks:
+    post:
+      tags: [Tasks]
+      summary: Создание задачи
+      description: Только заказчик (customer) может создать задачу.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Задача создана, статус — open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    get:
+      tags: [Tasks]
+      summary: Список задач
+      description: |
+        Возвращает список задач с поддержкой пагинации и фильтрации по статусу.
+        Доступно любой авторизованной роли.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, in_progress, completed, confirmed, cancelled]
+          description: Фильтр по статусу задачи
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+          description: Количество записей на странице (макс. 100)
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Смещение для пагинации
+      responses:
+        "200":
+          description: Список задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ==========================================================================
+  # Отклики
+  # ==========================================================================
+  /bids:
+    post:
+      tags: [Tasks]
+      summary: Создание отклика на задачу
+      description: Только исполнитель (executor) может откликнуться на задачу. Задача должна быть в статусе open.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBidRequest"
+      responses:
+        "201":
+          description: Отклик создан, статус — pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bid"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ==========================================================================
+  # Жизненный цикл задачи
+  # ==========================================================================
+  /tasks/{id}/accept_bid:
+    post:
+      tags: [Tasks]
+      summary: Принятие отклика исполнителя
+      description: |
+        Только заказчик-владелец задачи может принять отклик.
+        После принятия:
+        - выбранный отклик получает статус accepted
+        - все остальные отклики на эту задачу — rejected
+        - задача переходит в статус in_progress
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID задачи
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptBidRequest"
+      responses:
+        "200":
+          description: Отклик принят, задача переведена в in_progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /tasks/{id}/mark_completed:
+    post:
+      tags: [Tasks]
+      summary: Пометить задачу как выполненную
+      description: |
+        Только выбранный исполнитель (чей отклик был принят) может пометить задачу как выполненную.
+        Задача должна быть в статусе in_progress.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID задачи
+      responses:
+        "200":
+          description: Задача помечена как выполненная (completed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /tasks/{id}/confirm:
+    post:
+      tags: [Tasks]
+      summary: Подтверждение выполнения и оплата
+      description: |
+        **Атомарная операция в одной SQL-транзакции:**
+        1. Проверка баланса заказчика (с блокировкой строки FOR UPDATE)
+        2. Списание баллов у заказчика
+        3. Начисление баллов исполнителю
+        4. Создание записи в таблице payments
+        5. Перевод задачи в статус confirmed
+
+        Только заказчик-владелец может подтвердить выполнение.
+        Задача должна быть в статусе completed. Баланс заказчика должен покрывать бюджет задачи.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID задачи
+      responses:
+        "200":
+          description: Оплата произведена успешно
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          description: Недостаточно баллов у заказчика
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  # ==========================================================================
+  # Администрирование
+  # ==========================================================================
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Список всех пользователей
+      description: |
+        Только администратор может получить список всех пользователей.
+        Пароли (password_hash) не возвращаются.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/users/{id}/block:
+    post:
+      tags: [Admin]
+      summary: Блокировка пользователя
+      description: |
+        Только администратор может заблокировать пользователя.
+        Администратора заблокировать нельзя. Уже заблокированного повторно заблокировать нельзя.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID пользователя
+      responses:
+        "200":
+          description: Пользователь заблокирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /admin/users/{id}/unblock:
+    post:
+      tags: [Admin]
+      summary: Разблокировка пользователя
+      description: |
+        Только администратор может разблокировать пользователя.
+        Не заблокированного пользователя разблокировать нельзя.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID пользователя
+      responses:
+        "200":
+          description: Пользователь разблокирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT-токен, полученный через `/login`. Используйте формат `Bearer <token>`
+
+  schemas:
+    # --- User ---
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Уникальный идентификатор пользователя
+          example: 1
+        email:
+          type: string
+          format: email
+          description: Email пользователя
+          example: "customer@test.com"
+        role:
+          type: string
+          enum: [customer, executor, admin]
+          description: Роль пользователя
+          example: "customer"
+        balance:
+          type: number
+          format: float
+          description: Количество виртуальных баллов
+          example: 1000
+        is_blocked:
+          type: boolean
+          description: Флаг блокировки пользователя
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          description: Дата создания
+          example: "2026-05-28T12:00:00Z"
+
+    # --- Auth ---
+    RegisterRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email пользователя
+          example: "user@test.com"
+        password:
+          type: string
+          minLength: 6
+          description: Пароль (минимум 6 символов)
+          example: "pass123"
+        role:
+          type: string
+          enum: [customer, executor, admin]
+          description: Роль пользователя
+          example: "customer"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email пользователя
+          example: "user@test.com"
+        password:
+          type: string
+          description: Пароль
+          example: "pass123"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT-токен (срок действия — 24 часа)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    # --- Task ---
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID задачи
+          example: 1
+        customer_id:
+          type: integer
+          description: ID заказчика
+          example: 1
+        title:
+          type: string
+          description: Название задачи
+          example: "Разработать REST API"
+        description:
+          type: string
+          description: Описание задачи
+          example: "Нужно разработать бэкенд на Go"
+        budget:
+          type: number
+          format: float
+          description: Бюджет задачи в виртуальных баллах
+          example: 500
+        status:
+          type: string
+          enum: [open, in_progress, completed, confirmed, cancelled]
+          description: |
+            Статус задачи:
+            - `open` — открыта для откликов
+            - `in_progress` — выбран исполнитель, задача выполняется
+            - `completed` — исполнитель отметил задачу как выполненную
+            - `confirmed` — заказчик подтвердил выполнение, оплата произведена
+            - `cancelled` — задача отменена
+          example: "open"
+        created_at:
+          type: string
+          format: date-time
+          description: Дата создания
+          example: "2026-05-28T12:00:00Z"
+
+    CreateTaskRequest:
+      type: object
+      required: [title, budget]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Название задачи
+          example: "Разработать REST API"
+        description:
+          type: string
+          description: Описание задачи
+          example: "Нужно разработать бэкенд на Go"
+        budget:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+          description: Бюджет задачи (должен быть > 0)
+          example: 500
+
+    # --- Bid ---
+    Bid:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID отклика
+          example: 1
+        task_id:
+          type: integer
+          description: ID задачи, на которую откликнулись
+          example: 1
+        executor_id:
+          type: integer
+          description: ID исполнителя
+          example: 2
+        amount:
+          type: number
+          format: float
+          description: Сумма отклика
+          example: 500
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+          description: |
+            Статус отклика:
+            - `pending` — ожидает рассмотрения
+            - `accepted` — принят заказчиком
+            - `rejected` — отклонён
+          example: "pending"
+        created_at:
+          type: string
+          format: date-time
+          description: Дата создания
+          example: "2026-05-28T12:00:00Z"
+
+    CreateBidRequest:
+      type: object
+      required: [task_id, amount]
+      properties:
+        task_id:
+          type: integer
+          description: ID задачи
+          example: 1
+        amount:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+          description: Сумма отклика (должна быть > 0)
+          example: 500
+
+    AcceptBidRequest:
+      type: object
+      required: [bid_id]
+      properties:
+        bid_id:
+          type: integer
+          description: ID отклика, который нужно принять
+          example: 1
+
+    # --- Payment ---
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID платежа
+          example: 1
+        task_id:
+          type: integer
+          description: ID задачи
+          example: 1
+        from_user_id:
+          type: integer
+          description: ID заказчика (с кого списаны баллы)
+          example: 1
+        to_user_id:
+          type: integer
+          description: ID исполнителя (кому начислены баллы)
+          example: 2
+        amount:
+          type: number
+          format: float
+          description: Сумма перевода
+          example: 500
+        created_at:
+          type: string
+          format: date-time
+          description: Дата платежа
+          example: "2026-05-28T12:00:00Z"
+
+    # --- Common ---
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Текстовое сообщение о результате операции
+          example: "user blocked"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Код ошибки (машинно-читаемый)
+              example: "insufficient_balance"
+            message:
+              type: string
+              description: Описание ошибки (человеко-читаемое)
+              example: "customer has insufficient balance"
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос (неверный JSON, ошибка валидации)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Требуется аутентификация (JWT отсутствует или невалиден)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Доступ запрещён (недостаточно прав для данной роли)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Ресурс не найден (пользователь, задача или отклик)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Конфликт (недопустимый статус, повторное действие, уже заблокирован и т.п.)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
