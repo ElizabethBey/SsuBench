@@ -20,9 +20,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) *http.Serve
 	userRepo := repo.NewUserRepo(pool)
 	taskRepo := repo.NewTaskRepo(pool)
 	bidRepo := repo.NewBidRepo(pool)
+	paymentRepo := repo.NewPaymentRepo(pool)
 
 	authSvc := service.NewAuthService(userRepo, cfg)
-	taskSvc := service.NewTaskService(taskRepo, bidRepo)
+	taskSvc := service.NewTaskService(taskRepo, bidRepo, userRepo, paymentRepo, pool)
 
 	authHandler := handler.NewAuthHandler(authSvc)
 	taskHandler := handler.NewTaskHandler(taskSvc)
@@ -33,10 +34,15 @@ func New(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) *http.Serve
 	authMiddleware := AuthMiddleware(authSvc)
 	roleCustomer := RoleMiddleware(model.RoleCustomer)
 	roleExecutor := RoleMiddleware(model.RoleExecutor)
+	//roleAdmin := RoleMiddleware(model.RoleAdmin)
 
 	mux.Handle("POST /tasks", authMiddleware(roleCustomer(http.HandlerFunc(taskHandler.Create))))
 	mux.Handle("GET /tasks", authMiddleware(http.HandlerFunc(taskHandler.List)))
 	mux.Handle("POST /bids", authMiddleware(roleExecutor(http.HandlerFunc(taskHandler.CreateBid))))
+
+	mux.Handle("POST /tasks/{id}/accept_bid", authMiddleware(roleCustomer(http.HandlerFunc(taskHandler.AcceptBid))))
+	mux.Handle("POST /tasks/{id}/mark_completed", authMiddleware(roleExecutor(http.HandlerFunc(taskHandler.MarkCompleted))))
+	mux.Handle("POST /tasks/{id}/confirm", authMiddleware(roleCustomer(http.HandlerFunc(taskHandler.ConfirmCompletion))))
 
 	// Middleware (минимум): логирование + recover
 	handlr := RecoverMiddleware(logger, LoggingMiddleware(logger, mux))

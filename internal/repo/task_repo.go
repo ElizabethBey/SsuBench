@@ -14,6 +14,8 @@ type TaskRepo struct {
 	pool *pgxpool.Pool
 }
 
+var ErrTaskNotFound = errors.New("task not found")
+
 func NewTaskRepo(pool *pgxpool.Pool) *TaskRepo {
 	return &TaskRepo{pool: pool}
 }
@@ -30,7 +32,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, id int) (*model.Task, error) {
 	err := r.pool.QueryRow(ctx, query, id).Scan(&t.ID, &t.CustomerID, &t.Title, &t.Description, &t.Budget, &t.Status, &t.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUserNotFound
+			return nil, ErrTaskNotFound
 		}
 		return nil, err
 	}
@@ -72,5 +74,11 @@ func (r *TaskRepo) List(ctx context.Context, filter model.TaskFilter) ([]model.T
 func (r *TaskRepo) UpdateStatus(ctx context.Context, id int, status model.TaskStatus) error {
 	query := `UPDATE tasks SET status = $1 WHERE id = $2`
 	_, err := r.pool.Exec(ctx, query, status, id)
+	return err
+}
+
+func (r *TaskRepo) UpdateStatusInTx(ctx context.Context, tx pgx.Tx, id int, status model.TaskStatus) error {
+	query := `UPDATE tasks SET status = $1 WHERE id = $2`
+	_, err := tx.Exec(ctx, query, status, id)
 	return err
 }

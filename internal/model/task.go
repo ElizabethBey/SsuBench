@@ -9,6 +9,7 @@ const (
 	TaskStatusInProgress TaskStatus = "in_progress"
 	TaskStatusCompleted  TaskStatus = "completed"
 	TaskStatusCancelled  TaskStatus = "cancelled"
+	TaskStatusConfirmed  TaskStatus = "confirmed"
 )
 
 type Task struct {
