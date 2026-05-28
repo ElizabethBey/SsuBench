@@ -81,3 +81,28 @@ func (r *UserRepo) UpdateBalanceInTx(ctx context.Context, tx pgx.Tx, userID int,
 	_, err := tx.Exec(ctx, query, delta, userID)
 	return err
 }
+
+func (r *UserRepo) UpdateBlockStatus(ctx context.Context, userID int, blocked bool) error {
+	query := `UPDATE users SET is_blocked = $1 WHERE id = $2`
+	_, err := r.pool.Exec(ctx, query, blocked, userID)
+	return err
+}
+
+func (r *UserRepo) List(ctx context.Context) ([]model.User, error) {
+	query := `SELECT id, email, password_hash, role, balance, is_blocked, created_at FROM users ORDER BY id`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []model.User
+	for rows.Next() {
+		var u model.User
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Balance, &u.IsBlocked, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
