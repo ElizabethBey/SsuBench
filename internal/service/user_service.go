@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"ssubench/internal/model"
-	"ssubench/internal/repo"
 )
 
 var ErrCannotBlockAdmin = errors.New("cannot block an admin user")
@@ -12,10 +11,10 @@ var ErrUserAlreadyBlocked = errors.New("user is already blocked")
 var ErrUserNotBlocked = errors.New("user is not blocked")
 
 type UserService struct {
-	userRepo *repo.UserRepo
+	userRepo UserRepository
 }
 
-func NewUserService(userRepo *repo.UserRepo) *UserService {
+func NewUserService(userRepo UserRepository) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 
