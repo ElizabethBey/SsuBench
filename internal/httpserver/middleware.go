@@ -89,7 +89,7 @@ func LoggingMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusCapturingResponseWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(sw, r)
 		logger.Info("request",
 			"method", r.Method,
 			"path", r.URL.Path,

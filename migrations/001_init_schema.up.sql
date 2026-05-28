@@ -2,7 +2,7 @@
 CREATE TYPE user_role AS ENUM ('customer', 'executor', 'admin');
 
 -- Статусы задач
-CREATE TYPE task_status AS ENUM ('open', 'in_progress', 'completed', 'cancelled');
+CREATE TYPE task_status AS ENUM ('open', 'in_progress', 'completed', 'cancelled', 'confirmed');
 
 -- Статусы откликов
 CREATE TYPE bid_status AS ENUM ('pending', 'accepted', 'rejected');
@@ -37,7 +37,6 @@ CREATE TABLE bids (
   amount DECIMAL(15, 2) NOT NULL,
   status bid_status DEFAULT 'pending' NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
--- Ограничение: исполнитель может оставить только один отклик на одну задачу
   UNIQUE(task_id, executor_id)
 );
 
@@ -45,11 +44,18 @@ CREATE TABLE bids (
 CREATE TABLE payments (
   id SERIAL PRIMARY KEY,
   task_id INTEGER REFERENCES tasks(id),
-  sender_id INTEGER REFERENCES users(id),
-  receiver_id INTEGER REFERENCES users(id),
+  from_user_id INTEGER REFERENCES users(id),
+  to_user_id INTEGER REFERENCES users(id),
   amount DECIMAL(15, 2) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_tasks_status ON tasks(status);
+CREATE INDEX idx_tasks_customer_id ON tasks(customer_id);
+
 CREATE INDEX idx_bids_task ON bids(task_id);
+CREATE INDEX idx_bids_executor_id ON bids(executor_id);
+
+CREATE INDEX idx_payments_task_id ON payments(task_id);
+CREATE INDEX idx_payments_from_user_id ON payments(from_user_id);
+CREATE INDEX idx_payments_to_user_id ON payments(to_user_id);

@@ -19,7 +19,7 @@ import (
 var appName string
 
 func init() {
-	appName := "go-backend-template"
+	appName := "ssubench"
 	fmt.Printf("app name: %s\n", appName)
 }
 

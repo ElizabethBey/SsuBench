@@ -1,14 +1,4 @@
-# Go Backend Template
-
-Минимальный шаблон Go-сервиса:
-- cmd/app/main.go
-- internal/ (config, httpserver)
-- /health
-- slog JSON logs
-- graceful shutdown
-- tests
-- Makefile
-- Docker
+# ssubench
 
 ## Run
 ```bash
@@ -35,30 +25,32 @@ docker compose up --build
 ```
 
 
-## Lecture 2 examples
+## Регистрация пользователя:
 ```bash
-# runnable demo
-go run ./cmd/examples
-
-# tests
-go test ./...
+curl -X POST http://localhost:8080/register
+-H "Content-Type: application/json"
+-d '{"email": "test@test.com", "password": "mysecretpassword", "role": "customer"}'
 ```
 
+## Вход:
+```bash
+curl -X POST http://localhost:8080/login
+-H "Content-Type: application/json"
+-d '{"email": "test@test.com", "password": "mysecretpassword"}'
+```
 
-## Lecture 2 practice endpoints
-- GET /demo/zero
-- GET /demo/sum?a=10&b=20
-- GET /demo/switch?x=0
-- POST /demo/bytes
+## Создание задачи заказчиком:
+```bash
+curl -X POST http://localhost:8080/tasks
+-H "Authorization: Bearer CUSTOMER_TOKEN"
+-H "Content-Type: application/json"
+-d '{"title": "Разработать API", "description": "Нужен бэкенд на Go", "budget": 1000}'
+```
 
-See PRACTICE.md for details.
-
-
-## Lecture 3 demo endpoints
-- GET /demo3/parse?x=...
-- GET /demo3/user?id=...
-- GET /demo3/wrap
-- GET /demo3/slice
-- GET /demo3/map
-
-See PRACTICE3.md for details.
+## Отклик на задачу исполнителем:
+```bash
+curl -X POST http://localhost:8080/bids
+-H "Authorization: Bearer EXECUTOR_TOKEN"
+-H "Content-Type: application/json"
+-d '{"task_id": 1, "amount": 900}'
+```

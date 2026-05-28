@@ -62,3 +62,22 @@ func (r *UserRepo) GetByID(ctx context.Context, id int) (*model.User, error) {
 	}
 	return &u, nil
 }
+
+func (r *UserRepo) GetByIDInTx(ctx context.Context, tx pgx.Tx, id int) (*model.User, error) {
+	query := `SELECT id, email, password_hash, role, balance, is_blocked, created_at FROM users WHERE id = $1 FOR UPDATE`
+	var u model.User
+	err := tx.QueryRow(ctx, query, id).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Balance, &u.IsBlocked, &u.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) UpdateBalanceInTx(ctx context.Context, tx pgx.Tx, userID int, delta float64) error {
+	query := `UPDATE users SET balance = balance + $1 WHERE id = $2`
+	_, err := tx.Exec(ctx, query, delta, userID)
+	return err
+}
