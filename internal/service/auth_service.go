@@ -3,23 +3,23 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 	"ssubench/internal/config"
 	"ssubench/internal/model"
-	"ssubench/internal/repo"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var ErrInvalidCredentials = errors.New("invalid email or password")
 var ErrInvalidToken = errors.New("invalid token")
 
 type AuthService struct {
-	repo      *repo.UserRepo
+	repo      AuthUserRepository
 	jwtSecret string
 }
 
-func NewAuthService(r *repo.UserRepo, cfg config.Config) *AuthService {
+func NewAuthService(r AuthUserRepository, cfg config.Config) *AuthService {
 	return &AuthService{
 		repo:      r,
 		jwtSecret: cfg.JWTSecret,

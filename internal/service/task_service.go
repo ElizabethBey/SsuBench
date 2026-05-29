@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"ssubench/internal/model"
-	"ssubench/internal/repo"
 )
 
 var ErrTaskNotFound = errors.New("task not found")
@@ -17,14 +15,20 @@ var ErrNotAssignedExecutor = errors.New("you are not the assigned executor for t
 var ErrInsufficientBalance = errors.New("customer has insufficient balance")
 
 type TaskService struct {
-	taskRepo    *repo.TaskRepo
-	bidRepo     *repo.BidRepo
-	userRepo    *repo.UserRepo
-	paymentRepo *repo.PaymentRepo
-	pool        *pgxpool.Pool
+	taskRepo    TaskRepository
+	bidRepo     BidRepository
+	userRepo    UserRepository
+	paymentRepo PaymentRepository
+	pool        TxManager
 }
 
-func NewTaskService(tr *repo.TaskRepo, br *repo.BidRepo, ur *repo.UserRepo, pr *repo.PaymentRepo, pool *pgxpool.Pool) *TaskService {
+func NewTaskService(
+	tr TaskRepository,
+	br BidRepository,
+	ur UserRepository,
+	pr PaymentRepository,
+	pool TxManager,
+) *TaskService {
 	return &TaskService{
 		taskRepo:    tr,
 		bidRepo:     br,
